@@ -58,7 +58,7 @@ public class GraphQLConnectionTest {
     }
 
     @Test
-    public void fieldList() {
+    public void fieldList_first() {
         GraphQLObjectType object = GraphQLAnnotations.object(TestListField.class);
         GraphQLSchema schema = newSchema().query(object).build();
 
@@ -67,6 +67,35 @@ public class GraphQLConnectionTest {
         assertTrue(result.getErrors().isEmpty());
 
         testResult("objs", result);
+    }
+
+    @Test
+    public void fieldList_last() {
+        GraphQLObjectType object = GraphQLAnnotations.object(TestListField.class);
+        GraphQLSchema schema = newSchema().query(object).build();
+
+        ExecutionResult result = new GraphQL(schema).execute("{ objs(last: 1) { edges { cursor node { id, val } } } }",
+                new TestListField(Arrays.asList(new Obj("1", "test"), new Obj("2", "hello"), new Obj("3", "world"))));
+        assertTrue(result.getErrors().isEmpty());
+
+        // the result should be id: 3
+        testResult3("objs", result);
+    }
+
+    @Test
+    public void fieldList_before_after() {
+        GraphQLObjectType object = GraphQLAnnotations.object(TestListField.class);
+        GraphQLSchema schema = newSchema().query(object).build();
+
+        // "c2ltcGxlLWN1cnNvcjA" is the cursor of id 1
+        // "c2ltcGxlLWN1cnNvcjA=" is the cursor of id 3
+        // so this query only retrieves one item which is id 2
+        ExecutionResult result = new GraphQL(schema).execute("{ objs(before: \"c2ltcGxlLWN1cnNvcjI=\" after: \"c2ltcGxlLWN1cnNvcjA=\") { edges { cursor node { id, val } } } }",
+                new TestListField(Arrays.asList(new Obj("1", "test"), new Obj("2", "hello"), new Obj("3", "world"))));
+        assertTrue(result.getErrors().isEmpty());
+
+        // the result should be id: 2
+        testResult2("objs", result);
     }
 
     public static class TestConnections {
@@ -111,6 +140,24 @@ public class GraphQLConnectionTest {
         assertEquals(edges.size(), 1);
         assertEquals(edges.get(0).get("node").get("id"), "1");
         assertEquals(edges.get(0).get("node").get("val"), "test");
+    }
+
+    public void testResult2(String name, ExecutionResult result) {
+        Map<String, Map<String, List<Map<String, Map<String, Object>>>>> data = (Map<String, Map<String, List<Map<String, Map<String, Object>>>>>) result.getData();
+        List<Map<String, Map<String, Object>>> edges = data.get(name).get("edges");
+
+        assertEquals(edges.size(), 1);
+        assertEquals(edges.get(0).get("node").get("id"), "2");
+        assertEquals(edges.get(0).get("node").get("val"), "hello");
+    }
+
+    public void testResult3(String name, ExecutionResult result) {
+        Map<String, Map<String, List<Map<String, Map<String, Object>>>>> data = (Map<String, Map<String, List<Map<String, Map<String, Object>>>>>) result.getData();
+        List<Map<String, Map<String, Object>>> edges = data.get(name).get("edges");
+
+        assertEquals(edges.size(), 1);
+        assertEquals(edges.get(0).get("node").get("id"), "3");
+        assertEquals(edges.get(0).get("node").get("val"), "world");
     }
 
     @Test
